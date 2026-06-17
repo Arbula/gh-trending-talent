@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+
+venv/
+__pycache__/
+*/__pycache__/
+
+data/
+
+get_evidence.py
+evidence.txt

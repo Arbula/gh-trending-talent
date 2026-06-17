@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GH Trending Talent GitHub Intelligence</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">GH Trending Talent</p>
+        <h1>Open-source talent intelligence from GitHub trend signals</h1>
+      </div>
+      <div class="snapshot">
+        <span>Snapshot</span>
+        <strong>{{ product.snapshot_date }}</strong>
+      </div>
+    </header>
+
+    <main>
+      <form class="domain-filter" method="get" action="/">
+        <label for="domain">Hiring domain</label>
+        <div>
+          <input
+            id="domain"
+            name="domain"
+            value="{{ product.active_domain }}"
+            placeholder="product, payments, LLM infra, developer tools"
+          >
+          <input type="hidden" name="sort" value="{{ product.active_sort }}">
+          <button type="submit">Filter</button>
+          {% if product.active_domain %}
+          <a href="/?sort={{ product.active_sort }}">Clear</a>
+          {% endif %}
+        </div>
+        {% if product.active_domain %}
+        <p>
+          Matched {{ product.matching_repositories }} of {{ product.source_repositories }} evidence repositories.
+          Keywords: {{ ", ".join(product.domain_keywords) }}
+        </p>
+        {% endif %}
+      </form>
+
+      <section class="sortbar">
+        <span>Sort by</span>
+        {% for option in product.sort_options %}
+        <a
+          class="{% if option.key == product.active_sort %}active{% endif %}"
+          href="/?sort={{ option.key }}{% if product.active_domain %}&domain={{ product.active_domain|urlencode }}{% endif %}"
+        >{{ option.label }}</a>
+        {% endfor %}
+      </section>
+
+      <section class="metrics">
+        <div>
+          <span>Talent leads</span>
+          <strong>{{ product.talent|length }}</strong>
+        </div>
+        <div>
+          <span>High confidence</span>
+          <strong>{{ product.talent|selectattr("confidence", "equalto", "High")|list|length }}</strong>
+        </div>
+        <div>
+          <span>Evidence repos</span>
+          <strong>{{ product.repositories|length }}</strong>
+        </div>
+      </section>
+
+      <section class="panel talent-panel">
+        <div class="panel-title">
+          <h2>Recruiting-ready talent shortlist ({{ product.talent|length }})</h2>
+          <a href="/api/talent?sort={{ product.active_sort }}{% if product.active_domain %}&domain={{ product.active_domain|urlencode }}{% endif %}">JSON</a>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Candidate</th><th>Fit</th><th>Score</th><th>Confidence</th><th>Score basis</th><th>Evidence</th><th>Outreach next step</th></tr>
+          </thead>
+          <tbody>
+            {% for person in product.talent %}
+            <tr>
+              <td>
+                <strong>@{{ person.handle }}</strong>
+                <span class="subtle">{{ person.name or person.seniority_signal }}</span>
+                <span class="subtle">Human confidence {{ "%.0f"|format(person.human_confidence * 100) }}%</span>
+              </td>
+              <td>
+                {{ person.role_fit }}
+                <span class="subtle">{{ ", ".join(person.languages) }}</span>
+              </td>
+              <td>{{ person.recruiting_score }}</td>
+              <td>
+                <span class="badge">{{ person.confidence }}</span>
+                <span class="subtle">{{ person.confidence_score }}/100</span>
+              </td>
+              <td>
+                Impact {{ person.impact_score }}
+                <span class="subtle">PR {{ person.pr_score }} ({{ person.merged_pr_count }}) | Breadth {{ person.breadth_score }}</span>
+                <span class="subtle">Ecosystem {{ person.ecosystem_score }}</span>
+                <span class="subtle">Profile {{ person.profile_strength }} | Contributor {{ "%.2f"|format(person.best_contributor_weight) }}</span>
+                <span class="subtle">Projects {{ person.project_count }} | Languages {{ person.language_count }}</span>
+              </td>
+              <td>{{ person.reason }}</td>
+              <td>
+                {{ person.contact_strategy }}
+                <span class="subtle">{{ person.human_filter_reason }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+            {% if product.talent|length == 0 %}
+            <tr>
+              <td colspan="7">No matching candidates yet. Try a broader domain or ingest more languages.</td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="grid secondary-grid">
+        <div class="panel">
+        <div class="panel-title">
+            <h2>Candidate evidence details ({{ product.talent|length }})</h2>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Handle</th><th>Projects</th><th>Weighted impact</th><th>Raw repo impact</th></tr>
+            </thead>
+            <tbody>
+              {% for person in product.talent %}
+              <tr>
+                <td>@{{ person.handle }}</td>
+                <td>{{ ", ".join(person.projects) }}</td>
+                <td>{{ person.impact_score }}</td>
+                <td>{{ person.raw_impact_score }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">
+            <h2>Emerging technology trends ({{ product.trends|length }})</h2>
+            <a href="/api/trends">JSON</a>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Language</th><th>Adoption</th><th>Stars today</th><th>Top projects</th></tr>
+            </thead>
+            <tbody>
+              {% for trend in product.trends %}
+              <tr>
+                <td>{{ trend.language }}</td>
+                <td>{{ trend.adoption_score }}</td>
+                <td>{{ trend.stars_today }}</td>
+                <td>{{ ", ".join(trend.top_projects) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Repository momentum ({{ product.repositories|length }})</h2>
+          <a href="/report.md">Report</a>
+        </div>
+        <div class="cards">
+          {% for repo in product.repositories %}
+          <article class="repo-card">
+            <div>
+              <a href="{{ repo.url }}">{{ repo.repo }}</a>
+              <span>{{ repo.language }}</span>
+            </div>
+            <p>{{ repo.description }}</p>
+            <footer>
+              <span>{{ repo.stars_today }} today</span>
+              <span>{{ repo.stars }} stars</span>
+              <strong>{{ repo.score }}</strong>
+            </footer>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
